@@ -7,7 +7,7 @@ on:
 
 env:
   AWS_REGION: us-east-2
-  ECR_REPOSITORY: 345594603183.dkr.ecr.us-east-2.amazonaws.com/go/go-api
+  ECR_REPOSITORY: 345594603183.dkr.ecr.us-east-2.amazonaws.com
   ECS_CLUSTER: Docutize-dev
   ECS_SERVICE: go
   ECS_TASK_DEFINITION: .aws/task-definition.json
