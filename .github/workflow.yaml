@@ -1,0 +1,59 @@
+# .github/workflows/deploy.yml
+name: Deploy to Amazon ECS
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-2
+  ECR_REPOSITORY: 345594603183.dkr.ecr.us-east-2.amazonaws.com/go/go-api
+  ECS_CLUSTER: Docutize-dev
+  ECS_SERVICE: go
+  ECS_TASK_DEFINITION: .aws/task-definition.json
+  CONTAINER_NAME: go-api
+
+jobs:
+  deploy:
+    name: Deploy to ECS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag and push Docker image
+        run: |
+          IMAGE_TAG=${{ github.sha }}
+          docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+          docker tag $ECR_REPOSITORY:$IMAGE_TAG ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push ${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "IMAGE_URI=${{ steps.login-ecr.outputs.registry }}/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Fill in the new image ID in the task definition
+        run: |
+          sed "s|<IMAGE_URI>|${{ env.IMAGE_URI }}|g" $ECS_TASK_DEFINITION > task-definition.json
+
+      - name: Register new task definition in ECS
+        id: register-task-def
+        uses: aws-actions/amazon-ecs-register-task-definition@v1
+        with:
+          task-definition: task-definition.json
+
+      - name: Deploy ECS service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          task-definition: ${{ steps.register-task-def.outputs.task-definition-arn }}
