@@ -47,13 +47,18 @@ jobs:
 
       - name: Register new task definition in ECS
         id: register-task-def
-        uses: aws-actions/amazon-ecs-register-task-definition@v1
-        with:
-          task-definition: task-definition.json
+        run: |
+          arn=$(aws ecs register-task-definition \
+            --cli-input-json file://task-definition.json \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "TASK_DEF_ARN=$arn" >> $GITHUB_ENV
+
 
       - name: Deploy ECS service
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
           service: ${{ env.ECS_SERVICE }}
           cluster: ${{ env.ECS_CLUSTER }}
-          task-definition: ${{ steps.register-task-def.outputs.task-definition-arn }}
+          task-definition: ${{ env.TASK_DEF_ARN }}
+
