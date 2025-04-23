@@ -45,14 +45,13 @@ jobs:
         run: |
           sed "s|<IMAGE_URI>|${{ env.IMAGE_URI }}|g" $ECS_TASK_DEFINITION > task-definition.json
 
-      - name: Register new task definition in ECS
-        id: register-task-def
-        run: |
-          arn=$(aws ecs register-task-definition \
-            --cli-input-json file://task-definition.json \
-            --query 'taskDefinition.taskDefinitionArn' \
-            --output text)
-          echo "TASK_DEF_ARN=$arn" >> $GITHUB_ENV
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
 
 
       - name: Deploy ECS service
@@ -60,5 +59,6 @@ jobs:
         with:
           service: ${{ env.ECS_SERVICE }}
           cluster: ${{ env.ECS_CLUSTER }}
-          task-definition: ${{ env.TASK_DEF_ARN }}
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          wait-for-service-stability: true
 
